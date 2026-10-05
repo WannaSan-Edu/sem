@@ -115,17 +115,59 @@ public class App
                             + "Manager: " + emp.manager + "\n");
         }
     }
+    public void getEmployeesByTitle(String title)
+    {
+        try
+        {
+            String strSelect =
+                    "SELECT employees.emp_no, employees.first_name, "
+                            + "employees.last_name, salaries.salary "
+                            + "FROM employees, salaries, titles "
+                            + "WHERE employees.emp_no = salaries.emp_no "
+                            + "AND employees.emp_no = titles.emp_no "
+                            + "AND salaries.to_date = '9999-01-01' "
+                            + "AND titles.to_date = '9999-01-01' "
+                            + "AND titles.title = '" + title + "' "
+                            + "ORDER BY employees.emp_no ASC";
+
+            Statement stmt = con.createStatement();
+
+            ResultSet rset = stmt.executeQuery(strSelect);
+
+            while (rset.next())
+            {
+                Employee emp = new Employee();
+
+                emp.emp_no = rset.getInt("emp_no");
+                emp.first_name = rset.getString("first_name");
+                emp.last_name = rset.getString("last_name");
+                emp.title = title;
+                emp.salary = rset.getInt("salary");
+
+                System.out.println(
+                        emp.emp_no + " "
+                                + emp.first_name + " "
+                                + emp.last_name
+                                + " | " + emp.title
+                                + " | Salary: " + emp.salary
+                );
+            }
+        }
+        catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+            System.out.println("Failed to get employees by title");
+        }
+    }
     public static void main(String[] args)
     {
-        // Create new Application
         App a = new App();
 
         // Connect to database
         a.connect();
-        // Get Employee
-        Employee emp = a.getEmployee(255530);
-        // Display results
-        a.displayEmployee(emp);
+
+        // Get employees by title
+        a.getEmployeesByTitle("Staff");
 
         // Disconnect from database
         a.disconnect();
