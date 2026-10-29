@@ -1,39 +1,23 @@
 package com.napier.sem;
 
-public class Employee {
-
-    /**
-     * Employee number
-     */
+/**
+ * Represents an employee in the employees database.
+ */
+public class Employee
+{
     public int emp_no;
-
-    /**
-     * Employee's first name
-     */
     public String first_name;
-
-    /**
-     * Employee's last name
-     */
     public String last_name;
-
-    /**
-     * Employee's job title
-     */
     public String title;
-
-    /**
-     * Employee's salary
-     */
     public int salary;
 
-    /**
-     * Employee's current department
-     */
-    public String dept_name;
+    // Department in which this employee works
+    public Department dept;
 
-    /**
-     * Employee's manager
-     */
-    public String manager;
+    // Employee who manages this employee
+    public Employee manager;
+
+    public Employee()
+    {
+    }
 }
