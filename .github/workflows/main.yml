@@ -1,5 +1,5 @@
-
 name: A workflow for my Hello World App
+
 on:
   push:
     branches:
@@ -22,6 +22,7 @@ jobs:
           distribution: 'temurin'
       - name: Unit Tests
         run: mvn -Dtest=com.napier.devops.AppTest test
+
   IntegrationTests:
     name: Integration Tests
     runs-on: ubuntu-26.04
@@ -46,16 +47,10 @@ jobs:
       - name: CodeCov
         uses: codecov/codecov-action@v2
         with:
-         token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          token: ${{ secrets.CODECOV_TOKEN }}
           directory: ./target/site/jacoco
-          flags: Integration Tests # optional
-          verbose: true # optional (default = false)
-
-        
-        
-        
-        
-        
+          flags: Integration Tests
+          verbose: true
 
   build:
     name: Build and Start Using docker-compose
@@ -74,4 +69,3 @@ jobs:
         run: |
           mvn package -DskipTests
           docker compose up --abort-on-container-exit
-
