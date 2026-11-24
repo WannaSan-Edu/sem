@@ -1,5 +1,4 @@
-
-name: A workflow for my Hello World App
+name: Java CI with Tests, Coverage and Docker
 
 on:
   push:
@@ -13,73 +12,125 @@ on:
       - lab08
 
 jobs:
+  # Unit Tests
   UnitTests:
     name: Unit Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
+
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v5
         with:
           submodules: recursive
 
-      - name: Set up JDK 17
+      - name: Set up JDK 25
+        id: setup-java
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '25'
           distribution: 'temurin'
+          check-latest: true
 
-      - name: Unit Tests
+      - name: Verify and Enforce JDK 25
+        shell: bash
+        run: |
+          if [ -n "${{ steps.setup-java.outputs.path }}" ] && [ -d "${{ steps.setup-java.outputs.path }}" ]; then
+            export JAVA_HOME="${{ steps.setup-java.outputs.path }}"
+            export PATH="$JAVA_HOME/bin:$PATH"
+            echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+            echo "$JAVA_HOME/bin" >> "$GITHUB_PATH"
+          fi
+
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          javac -version
+
+          javac_major=$(javac -version 2>&1 | awk '{print $2}' | cut -d. -f1)
+          if [ "$javac_major" != "25" ]; then
+            echo "Error: Expected JDK/javac major version 25, but got '$javac_major'." >&2
+            exit 1
+          fi
+
+      - name: Run Unit Tests
         run: mvn clean -Dtest=com.napier.devops.AppTest test
 
-      - name: CodeCov
-        uses: codecov/codecov-action@v2
+      - name: Upload Unit Test Coverage to Codecov
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          directory: ./target/site/jacoco
+          files: ./target/site/jacoco/jacoco.xml
           flags: unit-tests
-          verbose: true
+          fail_ci_if_error: false
 
+  # Integration Tests
   IntegrationTests:
     name: Integration Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
+
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v5
         with:
           submodules: recursive
 
-      - name: Set up JDK 17
+      - name: Set up JDK 25
+        id: setup-java
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '25'
           distribution: 'temurin'
+          check-latest: true
 
-      - name: Start Database and Run Integration Tests
+      - name: Verify and Enforce JDK 25
+        shell: bash
+        run: |
+          if [ -n "${{ steps.setup-java.outputs.path }}" ] && [ -d "${{ steps.setup-java.outputs.path }}" ]; then
+            export JAVA_HOME="${{ steps.setup-java.outputs.path }}"
+            export PATH="$JAVA_HOME/bin:$PATH"
+            echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+            echo "$JAVA_HOME/bin" >> "$GITHUB_PATH"
+          fi
+
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          javac -version
+
+          javac_major=$(javac -version 2>&1 | awk '{print $2}' | cut -d. -f1)
+          if [ "$javac_major" != "25" ]; then
+            echo "Error: Expected JDK/javac major version 25, but got '$javac_major'." >&2
+            exit 1
+          fi
+
+      - name: Start Database Container
         run: |
           docker build -t database ./db
           docker run --name employees -dp 33060:3306 database
 
+      - name: Wait for Database
+        run: |
           for i in {1..30}; do
             if docker exec employees mysqladmin ping -h 127.0.0.1 --silent; then
               echo "Database is ready"
-              break
+              exit 0
             fi
             echo "Waiting for database..."
             sleep 2
           done
+          echo "Database did not become ready"
+          docker logs employees
+          exit 1
 
-          docker exec employees mysqladmin ping -h 127.0.0.1 --silent
+      - name: Run Integration Tests
+        run: mvn clean -Dtest=com.napier.devops.AppIntegrationTest test
 
-          mvn clean -Dtest=com.napier.devops.AppIntegrationTest test
-
-      - name: CodeCov
+      - name: Upload Integration Test Coverage to Codecov
         if: always()
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          directory: ./target/site/jacoco
+          files: ./target/site/jacoco/jacoco.xml
           flags: integration-tests
-          verbose: true
+          fail_ci_if_error: false
 
       - name: Stop and Remove Database
         if: always()
@@ -88,37 +139,50 @@ jobs:
           docker rm employees || true
           docker image rm database || true
 
-  build:
-    name: Build Run in Docker and Deploy Release
-    runs-on: ubuntu-22.04
-    needs:
-      - UnitTests
-      - IntegrationTests
+  # Build and Docker Compose
+  Build:
+    name: Build and Run Docker Compose
+    runs-on: ubuntu-26.04
+
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v5
         with:
           submodules: recursive
 
-      - name: Set up JDK 17
+      - name: Set up JDK 25
+        id: setup-java
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '25'
           distribution: 'temurin'
+          check-latest: true
 
-      - name: Package and Run docker compose
+      - name: Verify and Enforce JDK 25
+        shell: bash
         run: |
-          mvn package -DskipTests
-          docker compose up --build --abort-on-container-exit
+          if [ -n "${{ steps.setup-java.outputs.path }}" ] && [ -d "${{ steps.setup-java.outputs.path }}" ]; then
+            export JAVA_HOME="${{ steps.setup-java.outputs.path }}"
+            export PATH="$JAVA_HOME/bin:$PATH"
+            echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+            echo "$JAVA_HOME/bin" >> "$GITHUB_PATH"
+          fi
 
-      - name: Deploy Release
-        uses: marvinpinto/action-automatic-releases@latest
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: false
-          automatic_release_tag: "latest"
-          files: |
-            ./target/*.jar
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          javac -version
+
+          javac_major=$(javac -version 2>&1 | awk '{print $2}' | cut -d. -f1)
+          if [ "$javac_major" != "25" ]; then
+            echo "Error: Expected JDK/javac major version 25, but got '$javac_major'." >&2
+            exit 1
+          fi
+
+      - name: Build Maven Package
+        run: mvn clean package -DskipTests
+
+      - name: Run Docker Compose
+        run: docker compose up --build --abort-on-container-exit
 
       - name: Stop Docker Compose
         if: always()
