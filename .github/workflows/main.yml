@@ -20,6 +20,7 @@ jobs:
         with:
           java-version: '25'
           distribution: 'temurin'
+          cache: 'maven'
 
       - name: Unit Tests
         run: mvn -Dtest=com.napier.devops.AppTest test
@@ -27,7 +28,7 @@ jobs:
       - name: CodeCov
         uses: codecov/codecov-action@v2
         with:
-          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          # token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
           directory: ./target/site/jacoco
           flags: Unit Tests # optional
           verbose: true # optional (default = false)
@@ -46,15 +47,24 @@ jobs:
         with:
           java-version: '25'
           distribution: 'temurin'
+          cache: 'maven'
 
       - name: Integration Tests and CodeCov
         run: |
           docker build -t database ./db
           docker run --name employees -dp 33060:3306 database
+          for i in {1..30}; do
+            if docker exec employees mysqladmin ping -h 127.0.0.1 --silent; then
+              echo "Database is ready"
+              break
+            fi
+            echo "Waiting for database..."
+            sleep 2
+          done
           mvn -Dtest=com.napier.devops.AppIntegrationTest test
-          docker stop employees
-          docker rm employees
-          docker image rm database
+          docker stop employees || true
+          docker rm employees || true
+          docker image rm database || true
 
       - name: CodeCov
         uses: codecov/codecov-action@v2
@@ -78,6 +88,7 @@ jobs:
         with:
           java-version: '25'
           distribution: 'temurin'
+          cache: 'maven'
 
       - name: Package and Run docker compose
         run: |
