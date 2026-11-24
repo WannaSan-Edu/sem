@@ -5,18 +5,18 @@ on:
     branches:
       - master
       - lab08
-
   pull_request:
     branches:
       - master
       - lab08
 
+permissions:
+  contents: write
+
 jobs:
-  # Unit Tests
   UnitTests:
     name: Unit Tests
     runs-on: ubuntu-26.04
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -62,11 +62,9 @@ jobs:
           flags: unit-tests
           fail_ci_if_error: false
 
-  # Integration Tests
   IntegrationTests:
     name: Integration Tests
     runs-on: ubuntu-26.04
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -139,11 +137,9 @@ jobs:
           docker rm employees || true
           docker image rm database || true
 
-  # Build and Docker Compose
   Build:
-    name: Build and Run Docker Compose
+    name: Build Run in Docker and Deploy Release
     runs-on: ubuntu-26.04
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -178,12 +174,21 @@ jobs:
             exit 1
           fi
 
-      - name: Build Maven Package
-        run: mvn clean package -DskipTests
-
-      - name: Run Docker Compose
-        run: docker compose up --build --abort-on-container-exit
+      - name: Package and Run Docker Compose
+        run: |
+          mvn clean package -DskipTests
+          docker compose up --build --abort-on-container-exit
 
       - name: Stop Docker Compose
         if: always()
         run: docker compose down
+
+      - name: Deploy Release
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          automatic_release_tag: "latest"
+          files: |
+            ./target/*.jar
